@@ -1,0 +1,82 @@
+<style>
+     body { 
+    background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+    background-size: 100% 100%;
+    min-height: 100vh;
+    color: white;
+    position: relative;
+   .glass-card { background: rgba(207, 7, 160, 0.177); backdrop-filter: blur(20px); border: 5px solid rgba(107, 20, 236, 0.2); border-radius: 30px; }
+}
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-image: 
+        radial-gradient(2px 2px at 20px 30px, #1bc958, transparent),
+        radial-gradient(2px 2px at 40px 70px, white, transparent),
+        radial-gradient(1px 1px at 90px 40px, #4d06c7, transparent),
+        radial-gradient(1px 1px at 130px 80px, #a41616, transparent);
+    background-repeat: repeat;
+    background-size: 200px 100px;
+    animation: stars 20s linear infinite;
+    box-shadow: #1bc958 0px 0px 10px, white 0px 0px 5px, #4d06c7 0px 0px 15px, #a41616 0px 0px 20px ;
+}
+@keyframes stars {
+    from { transform: translateY(0px); }
+    to { transform: translateY(-100px); }
+}   
+
+.glass-card, .admin-card {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.btn {
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-weight: 600;
+    border: none  !important;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+}
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102,126,234,0.4);
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #4ecdc4, #44a08d);
+}
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(78,205,196,0.4);
+}
+
+.btn-danger {
+    background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+}
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(255,107,107,0.4);
+}
+
+.glass-card:hover, .admin-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+}
+
+.form-control:focus {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.5);
+    box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.2);
+}
+</style>

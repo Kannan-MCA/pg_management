@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>{{ pg.name }} - Rooms</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+            background-size: 100% 100%;
+            min-height: 100vh;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            position: relative;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #1bc958, transparent),
+                radial-gradient(2px 2px at 40px 70px, white, transparent),
+                radial-gradient(1px 1px at 90px 40px, #4d06c7, transparent),
+                radial-gradient(1px 1px at 130px 80px, #a41616, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: stars 20s linear infinite;
+            box-shadow: #1bc958 0px 0px 10px, white 0px 0px 5px, #4d06c7 0px 0px 15px, #a41616 0px 0px 20px;
+        }
+        @keyframes stars {
+            from { transform: translateY(0px); }
+            to { transform: translateY(-100px); }
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        }
+        
+        .room-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .btn-glow {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            border: none;
+            border-radius: 12px;
+            padding: 15px 30px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 10px 30px rgba(78,205,196,0.4);
+            transition: all 0.3s;
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(78,205,196,0.6);
+        }
+    </style>
+</head>
+<body>
+    <!-- ✅ FIXED NAVBAR - CORRECT SYNTAX -->
+    <nav class="navbar navbar-dark bg-transparent py-4">
+        <div class="container">
+            <!-- ✅ FIXED: PROPER url_for() SYNTAX -->
+            <a href="{{ url_for('pgs') }}" class="btn btn-outline-light btn-lg">
+                <i class="fas fa-arrow-left me-2"></i>Back to PGs
+            </a>
+            <!-- PG Header -->
+            <div class="text-center mx-auto flex-grow-1">
+                <h2 class="mb-1 fw-bold">{{ pg.name }}</h2>
+                <p class="text-white-50 mb-0">{{ pg.location }}</p>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        {% if rooms %}
+        <div class="row g-4">
+            {% for room in rooms %}
+            <div class="col-xl-4 col-lg-6 col-md-6">
+                <div class="glass-card p-4 h-100">
+                    <!-- ✅ FIXED: Proper image path -->
+                    {% if room.image_url %}
+                        <img src="{{ url_for('static', filename='uploads/rooms/' + room.image_url) }}" 
+                             class="room-img mb-4" alt="Room {{ room.number }}"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                        <!-- Fallback image -->
+                        <div class="room-img bg-secondary d-flex align-items-center justify-content-center mb-4 d-none" 
+                             style="border-radius: 15px;">
+                            <i class="fas fa-image fa-3x text-muted"></i>
+                        </div>
+                    {% else %}
+                        <div class="room-img bg-secondary d-flex align-items-center justify-content-center mb-4">
+                            <i class="fas fa-image fa-3x text-muted"></i>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Room Details -->
+                    <div class="text-center">
+                        <h3 class="fw-bold mb-3">Room {{ room.number }}</h3>
+                        
+                        <!-- Price & Status -->
+                        <div class="mb-4">
+                            <span class="badge bg-success fs-4 d-block mb-2">₹{{ "%.0f"|format(room.price) }}/month</span>
+                            <span class="badge bg-success fs-5 px-4 py-2">Available Now</span>
+                        </div>
+                        
+                        <!-- Features -->
+                        <div class="mb-4">
+                            <span class="badge bg-info fs-6 me-2 mb-1 d-block">{{ room.sharing }} Sharing</span>
+                            <span class="badge bg-{{ 'warning' if room.ac_type == 'ac' else 'secondary' }} fs-6 px-3">
+                                {{ room.ac_type|replace('-', ' ')|title }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- ✅ FIXED: WORKING Book Now - GET LINK -->
+                    <div class="text-center mt-auto">
+                        <a href="{{ url_for('book_room', room_id=room.id) }}" 
+                           class="btn btn-glow btn-success btn-lg w-100">
+                            <i class="fas fa-calendar-check me-2"></i>Book Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <div class="glass-card p-5">
+                <i class="fas fa-bed fa-5x text-white-50 mb-4"></i>
+                <h3 class="mb-3">No Rooms Available</h3>
+                <p class="text-white-50 fs-5 mb-4">Admin needs to add rooms to this PG property</p>
+                <!-- ✅ FIXED: CORRECT SYNTAX -->
+                <a href="{{ url_for('pgs') }}" class="btn btn-glow btn-outline-light btn-lg px-5">
+                    <i class="fas fa-home me-2"></i>View Other PGs
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

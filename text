@@ -1,0 +1,31 @@
+
+pg_management/                                    # ✅ ROOT
+├── app.py                   # App factory + login
+├── config.py                # Config settings
+├── models.py                # Database models
+├── requirements.txt         # Dependencies
+├── run.py                   # Dev runner
+├── pg_management.db         # Auto-created DB ✅
+├── instance/                # (Optional - empty)
+└── pg_app/                  # Blueprints & Assets
+    ├── __init__.py          # Empty
+    ├── static/
+    │   └── css/
+    │       └── style.css    # Glassmorphism UI
+    ├── templates/           # Shared base.html
+    │   └── base.html
+    ├── admin/
+    │   ├── __init__.py      # Empty
+    │   ├── routes.py        # Admin CRUD
+    │   └── templates/
+    │       ├── login.html
+    │       ├── dashboard.html
+    │       └── pgs.html
+    └── tenant/
+        ├── __init__.py      # Empty
+        ├── routes.py        # Tenant booking
+        └── templates/
+            ├── login.html
+            ├── pgs.html
+            ├── rooms.html
+            └── my_bookings.html

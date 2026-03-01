@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="glass-card p-4 text-center text-white">
+            <h3>{{ stats.total_pgs }}</h3>
+            <p>Total PGs</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-4 text-center text-white">
+            <h3>{{ stats.total_rooms }}</h3>
+            <p>Total Rooms</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-4 text-center text-white">
+            <h3>{{ stats.available_rooms }}</h3>
+            <p>Available</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="glass-card p-4 text-center text-white">
+            <h3>{{ stats.pending_bookings }}</h3>
+            <p>Pending Bookings</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <a href="{{ url_for('admin.manage_pgs') }}" class="btn btn-primary w-100 mb-3">Manage PGs</a>
+    </div>
+    <div class="col-md-6">
+        <a href="#" class="btn btn-secondary w-100 mb-3">View Bookings</a>
+    </div>
+</div>
+{% endblock %}
