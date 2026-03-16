@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Manage PGs{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+      <i class="fas fa-city me-2 text-info"></i>
+      Manage PGs
+    </h2>
+    <a href="{{ url_for('superadmin_dashboard') }}" class="btn btn-outline-light btn-sm">
+      <i class="fas fa-arrow-left me-1"></i>Dashboard
+    </a>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card-glass p-3 mb-4">
+    <h5 class="mb-3">Add New PG</h5>
+    <form method="post" class="row g-2">
+      <div class="col-md-5">
+        <input type="text" name="name" class="form-control form-control-sm"
+               placeholder="PG Name" required>
+      </div>
+      <div class="col-md-5">
+        <input type="text" name="location" class="form-control form-control-sm"
+               placeholder="Location">
+      </div>
+      <div class="col-md-2 text-end">
+        <button class="btn btn-info btn-sm w-100" type="submit">
+          <i class="fas fa-plus me-1"></i>Add
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card-glass p-4">
+    {% if pgs %}
+      <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>PG Name</th>
+              <th>Location</th>
+              <th>Rooms</th>
+              <th>Assign / Update Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pg in pgs %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ pg.name }}</td>
+                <td>{{ pg.location or '-' }}</td>
+                <td>{{ pg.total_rooms or 0 }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('superadmin_assign_admin', pg_id=pg.id) }}"
+                        class="row g-1 align-items-center">
+                    <div class="col-md-5">
+                      <input type="email" name="admin_email"
+                             class="form-control form-control-sm"
+                             placeholder="admin email" required>
+                    </div>
+                    <div class="col-md-4">
+                      <input type="text" name="admin_password"
+                             class="form-control form-control-sm"
+                             placeholder="password (optional)">
+                    </div>
+                    <div class="col-md-3">
+                      <button class="btn btn-success btn-sm w-100" type="submit">
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-white-50 mb-0">No PGs yet. Add one using the form above.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,35 +1,24 @@
 import os
 from datetime import datetime, date
-from calendar import monthrange
+from functools import wraps
 
-from sqlalchemy import func
 from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    flash,
+    Flask, render_template, request, redirect,
+    url_for, flash, abort
 )
 from flask_login import (
-    LoginManager,
-    login_user,
-    login_required,
-    current_user,
-    logout_user,
+    LoginManager, login_user, login_required,
+    current_user, logout_user
 )
 from werkzeug.utils import secure_filename
+from sqlalchemy import func
 
 from config import DevelopmentConfig, Config
 from extensions import db
 from models import (
-    User,
-    PG,
-    Room,
-    Booking,
-    ServiceType,
-    BookingService,
-    Attendance,
+    User, PG, Room, Booking,
+    ServiceType, BookingService,
+    Attendance
 )
 
 app = Flask(__name__)
@@ -37,33 +26,12 @@ app.config.from_object(DevelopmentConfig)
 
 db.init_app(app)
 login_manager = LoginManager(app)
-login_manager.login_view = "login"  # unified login view
+login_manager.login_view = "login"
 
-# folder paths
 UPLOAD_FOLDER = app.config["UPLOAD_FOLDER"]
 ID_PROOF_FOLDER = app.config["ID_PROOF_FOLDER"]
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ID_PROOF_FOLDER, exist_ok=True)
-
-
-def allowed_file(filename: str) -> bool:
-    return Config.allowed_file(filename)
-
-
-def search_pgs(query):
-    if not query or len(query) < 2:
-        return PG.query.all()
-
-    return (
-        PG.query.filter(
-            (PG.location.ilike(f"%{query}%"))
-            | (PG.name.ilike(f"%{query}%"))
-            | (PG.latitude.cast(db.String).ilike(f"%{query}%"))
-            | (PG.longitude.cast(db.String).ilike(f"%{query}%"))
-        )
-        .order_by(PG.name)
-        .all()
-    )
 
 
 @login_manager.user_loader
@@ -71,56 +39,59 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# ---- Utility: compute booking revenue including services ----
+def allowed_file(filename: str) -> bool:
+    return Config.allowed_file(filename)
+
+
+def roles_required(*roles):
+    def decorator(view):
+        @wraps(view)
+        @login_required
+        def wrapped(*args, **kwargs):
+            if current_user.role not in roles:
+                abort(403)
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def search_pgs(query):
+    if not query or len(query) < 2:
+        return PG.query.all()
+    return (
+        PG.query.filter(
+            (PG.location.ilike(f"%{query}%"))
+            | (PG.name.ilike(f"%{query}%"))
+        )
+        .order_by(PG.name)
+        .all()
+    )
+
+
 def compute_booking_total(booking: Booking) -> float:
     base = booking.amount or (booking.room.price if booking.room else 0.0)
     addons = sum(s.total_price for s in booking.services)
     return base + addons
 
 
-# ---- Initial admin + service seeding ----
-@app.route("/init_seed")
-def init_seed():
-    if not User.query.filter_by(username="admin").first():
-        admin = User(username="admin", role="admin")
-        admin.set_password("admin123")
-        db.session.add(admin)
-
-    defaults = [
-        ("Laundry", "laundry", 30.0),
-        ("Breakfast", "food", 50.0),
-        ("Lunch", "food", 80.0),
-        ("Dinner", "food", 80.0),
-    ]
-    for name, cat, price in defaults:
-        if not ServiceType.query.filter_by(name=name, category=cat).first():
-            db.session.add(ServiceType(name=name, category=cat, price=price))
-
-    db.session.commit()
-    return "Seeded admin and basic services."
-
-
-@app.route("/init_tenant")
-def init_tenant():
-    # example tenant user; username should match tenant_email used in bookings
-    email = "tenant1@example.com"
-    user = User.query.filter_by(username=email).first()
-    if not user:
-        user = User(username=email, role="tenant")
-        user.set_password("tenant123")
-        db.session.add(user)
+# ---------- Seed superadmin & sample ----------
+@app.route("/init_superadmin")
+def init_superadmin():
+    if not User.query.filter_by(username="superadmin@example.com").first():
+        u = User(username="superadmin@example.com", role="superadmin")
+        u.set_password("superadmin123")
+        db.session.add(u)
         db.session.commit()
-        return f"Tenant user created: {email} / tenant123"
-    return "Tenant user already exists"
+        return "Superadmin created: superadmin@example.com / superadmin123"
+    return "Superadmin already exists"
 
 
-# ---- Public / tenant-facing routes ----
+# ---------- Guest / public pages ----------
 @app.route("/")
-@app.route("/pgs")
-def pgs():
+def home():
     search_query = request.args.get("search", "").strip()
     pgs = search_pgs(search_query) if search_query else PG.query.all()
-    return render_template("pgs.html", pgs=pgs, search_query=search_query)
+    return render_template("guest/home.html", pgs=pgs, search_query=search_query)
 
 
 @app.route("/pg/<int:pg_id>")
@@ -133,7 +104,6 @@ def rooms(pg_id):
     ac_type = request.args.get("ac_type")
 
     q = Room.query.filter_by(pg_id=pg_id, available=True)
-
     if min_price:
         q = q.filter(Room.price >= float(min_price))
     if max_price:
@@ -144,7 +114,7 @@ def rooms(pg_id):
         q = q.filter(Room.ac_type == ac_type)
 
     rooms = q.order_by(Room.price).all()
-    return render_template("rooms.html", pg=pg, rooms=rooms)
+    return render_template("guest/rooms.html", pg=pg, rooms=rooms)
 
 
 @app.route("/book/<int:room_id>", methods=["GET", "POST"])
@@ -165,8 +135,7 @@ def book_room(room_id):
 
         move_in_date = (
             datetime.strptime(move_in_date_str, "%Y-%m-%d").date()
-            if move_in_date_str
-            else None
+            if move_in_date_str else None
         )
 
         id_proof_filename = None
@@ -182,7 +151,7 @@ def book_room(room_id):
         if not tenant_name or not tenant_phone:
             flash("Please fill name and phone number!", "danger")
             pg = PG.query.get(room.pg_id)
-            return render_template("booking/form.html", room=room, pg=pg)
+            return render_template("guest/booking_form.html", room=room, pg=pg)
 
         booking = Booking(
             tenant_name=tenant_name,
@@ -195,18 +164,18 @@ def book_room(room_id):
             amount=amount,
             payment_status="pending",
             kyc_status="pending",
-            booking_status="kyc_pending",
+            booking_status="requested",
         )
         db.session.add(booking)
         db.session.flush()
         room.available = False
         db.session.commit()
 
-        flash(f"✅ Booking confirmed! ID: BK{booking.id:04d}", "success")
+        flash(f"Booking request submitted! ID: BK{booking.id:04d}", "success")
         return redirect(url_for("booking_receipt", booking_id=booking.id))
 
     pg = PG.query.get(room.pg_id)
-    return render_template("booking/form.html", room=room, pg=pg)
+    return render_template("guest/booking_form.html", room=room, pg=pg)
 
 
 @app.route("/booking/receipt/<int:booking_id>")
@@ -216,7 +185,7 @@ def booking_receipt(booking_id):
     pg = room.pg
     total = compute_booking_total(booking)
     return render_template(
-        "booking/receipt.html",
+        "guest/booking_receipt.html",
         booking=booking,
         room=room,
         pg=pg,
@@ -224,11 +193,12 @@ def booking_receipt(booking_id):
     )
 
 
-# ---- Unified login / logout ----
+# ---------- Auth ----------
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # already logged in: send to correct dashboard
     if current_user.is_authenticated:
+        if current_user.role == "superadmin":
+            return redirect("/superadmin/dashboard")
         if current_user.role == "admin":
             return redirect("/admin/dashboard")
         if current_user.role == "tenant":
@@ -241,178 +211,128 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
+            if user.role == "superadmin":
+                return redirect("/superadmin/dashboard")
             if user.role == "admin":
                 return redirect("/admin/dashboard")
-            else:
-                return redirect("/tenant/dashboard")
+            return redirect("/tenant/dashboard")
 
-        flash("Invalid credentials", "error")
+        flash("Invalid credentials", "danger")
 
-    return render_template("login.html")
-
-
-# optional alias to keep old URL working
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login_alias():
-    return redirect(url_for("login"))
+    return render_template("auth/login.html")
 
 
-@app.route("/admin/logout")
+@app.route("/logout")
 @login_required
-def admin_logout():
+def logout():
     logout_user()
-    flash("Logged out successfully!")
-    return redirect("/login")
+    flash("Logged out successfully!", "success")
+    return redirect(url_for("home"))
 
 
-# ---- Tenant dashboard & services & billing ----
-@app.route("/tenant/dashboard")
-@login_required
-def tenant_dashboard():
-    if current_user.role != "tenant":
-        flash("Tenant access only")
-        return redirect("/admin/dashboard")
-
-    bookings = Booking.query.filter_by(tenant_email=current_user.username).all()
-    return render_template("tenant/dashboard.html", bookings=bookings)
-
-
-@app.route("/tenant/booking/<int:booking_id>/services", methods=["GET", "POST"])
-@login_required
-def tenant_services(booking_id):
-    booking = Booking.query.get_or_404(booking_id)
-    if current_user.role != "tenant":
-        flash("Tenant access only")
-        return redirect("/")
-
-    services = ServiceType.query.filter_by(active=True).all()
-
-    if request.method == "POST":
-        for s in services:
-            qty_str = request.form.get(f"service_{s.id}")
-            if qty_str:
-                qty = int(qty_str)
-                if qty > 0:
-                    total_price = qty * s.price
-                    db.session.add(
-                        BookingService(
-                            booking_id=booking.id,
-                            service_type_id=s.id,
-                            quantity=qty,
-                            total_price=total_price,
-                        )
-                    )
-        db.session.commit()
-        flash("Services added to your booking.", "success")
-        return redirect(url_for("tenant_dashboard"))
-
-    return render_template("tenant/services.html", booking=booking, services=services)
-
-
-@app.route("/tenant/billing")
-@login_required
-def tenant_billing():
-    if current_user.role != "tenant":
-        flash("Tenant access only")
-        return redirect("/login")
-
-    # get latest booking for this tenant using tenant_email
-    booking = (
-        Booking.query
-        .filter_by(tenant_email=current_user.username)
-        .order_by(Booking.id.desc())
-        .first_or_404()
-    )
-
-    # nights: if you later add check_in/check_out, replace this logic
-    nights = 1
-    if getattr(booking, "check_in", None) and getattr(booking, "check_out", None):
-        try:
-            nights = (booking.check_out.date() - booking.check_in.date()).days or 1
-        except Exception:
-            nights = 1
-
-    # room rate from your Room model
-    room_rate = booking.room.price
-    room_total = nights * room_rate
-
-    # services added for this booking
-    service_items = []
-    for s in booking.services:
-        service_items.append({
-            "name": s.service_type.name,
-            "unit_price": s.service_type.price,
-            "quantity": s.quantity,
-            "total": s.total_price,
-        })
-
-    subtotal = room_total + sum(i["total"] for i in service_items)
-    tax_percent = 12
-    tax_amount = subtotal * tax_percent / 100
-    total_payable = subtotal + tax_amount
-
-    amount_received = total_payable if booking.payment_status == "paid" else 0
-    balance = total_payable - amount_received
-
-    billing = {
-        "invoice_no": f"INV-{booking.id:04d}",
-        "date": booking.booking_date or datetime.utcnow(),
-        "booking": booking,
-        "guest": {
-            "name": booking.tenant_name,
-            "address": "",  # fill later if you add address field
-            "phone": booking.tenant_phone,
-            "email": booking.tenant_email,
-        },
-        "nights": nights,
-        "room_rate": room_rate,
-        "room_total": room_total,
-        "service_items": service_items,
-        "other_items": [],
-        "subtotal": subtotal,
-        "tax_percent": tax_percent,
-        "tax_amount": tax_amount,
-        "discount_amount": 0,
-        "total_payable": total_payable,
-        "amount_received": amount_received,
-        "balance": balance,
-        "payment_method": getattr(booking, "payment_method", "Cash"),
-        "remarks": "",
-        "is_paid": booking.payment_status == "paid",
-    }
-
-    hotel = {
-        "name": "Your PG Name",
-        "address": "Full address here",
-        "phone": "9876543210",
-        "email": "info@example.com",
-    }
-
-    return render_template(
-        "tenant/billing.html",
-        billing=billing,
-        hotel=hotel,
-    )
-
-
-# ---- Admin dashboard & bookings ----
-@app.route("/admin/dashboard")
-@login_required
-def admin_dashboard():
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
+# ---------- Superadmin: global PG & stats ----------
+@app.route("/superadmin/dashboard")
+@roles_required("superadmin")
+def superadmin_dashboard():
     stats = {
         "total_pgs": PG.query.count(),
         "total_rooms": Room.query.count(),
-        "available_rooms": Room.query.filter_by(available=True).count(),
         "total_bookings": Booking.query.count(),
         "paid_bookings": Booking.query.filter_by(payment_status="paid").count(),
     }
+    paid = Booking.query.filter_by(payment_status="paid").all()
+    total_revenue = sum(compute_booking_total(b) for b in paid)
+    return render_template(
+        "superadmin/dashboard.html",
+        stats=stats,
+        total_revenue=total_revenue,
+    )
 
-    paid_bookings = Booking.query.filter_by(payment_status="paid").all()
-    total_revenue = sum(compute_booking_total(b) for b in paid_bookings)
+
+@app.route("/superadmin/pgs", methods=["GET", "POST"])
+@roles_required("superadmin")
+def superadmin_pgs():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        location = request.form.get("location", "").strip()
+        if not name:
+            flash("Name is required", "danger")
+            return redirect(url_for("superadmin_pgs"))
+        pg = PG(name=name, location=location or None)
+        db.session.add(pg)
+        db.session.commit()
+        flash("PG created", "success")
+        return redirect(url_for("superadmin_pgs"))
+
+    pgs = PG.query.order_by(PG.id.desc()).all()
+    return render_template("superadmin/pgs.html", pgs=pgs)
+
+
+@app.route("/superadmin/pgs/<int:pg_id>/assign_admin", methods=["POST"])
+@roles_required("superadmin")
+def superadmin_assign_admin(pg_id):
+    pg = PG.query.get_or_404(pg_id)
+    email = request.form.get("admin_email")
+    password = request.form.get("admin_password") or "Admin@" + str(pg.id)
+
+    user = User.query.filter_by(username=email).first()
+    if user:
+        user.role = "admin"
+        user.pg_id = pg.id
+    else:
+        user = User(username=email, role="admin", pg_id=pg.id)
+        user.set_password(password)
+        db.session.add(user)
+    db.session.commit()
+    flash(f"Admin assigned to PG {pg.name}", "success")
+    return redirect(url_for("superadmin_pgs"))
+
+
+# ---------- Admin: scoped dashboard / bookings / attendance ----------
+def admin_scoped_bookings():
+    q = Booking.query
+    if current_user.role == "admin":
+        q = q.join(Room).filter(Room.pg_id == current_user.pg_id)
+    return q
+
+
+@app.route("/admin/dashboard")
+@roles_required("admin", "superadmin")
+def admin_dashboard():
+    if current_user.role == "admin":
+        pg_id = current_user.pg_id
+        total_rooms = Room.query.filter_by(pg_id=pg_id).count()
+        available_rooms = Room.query.filter_by(pg_id=pg_id, available=True).count()
+        total_bookings = (
+            Booking.query.join(Room).filter(Room.pg_id == pg_id).count()
+        )
+        total_pgs = 1
+        paid_bookings = (
+            Booking.query.join(Room)
+            .filter(Room.pg_id == pg_id, Booking.payment_status == "paid")
+            .count()
+        )
+        paid = (
+            Booking.query.join(Room)
+            .filter(Room.pg_id == pg_id, Booking.payment_status == "paid")
+            .all()
+        )
+    else:  # superadmin viewing admin dashboard as global view
+        total_pgs = PG.query.count()
+        total_rooms = Room.query.count()
+        available_rooms = Room.query.filter_by(available=True).count()
+        total_bookings = Booking.query.count()
+        paid_bookings = Booking.query.filter_by(payment_status="paid").count()
+        paid = Booking.query.filter_by(payment_status="paid").all()
+
+    stats = {
+        "total_pgs": total_pgs,
+        "total_rooms": total_rooms,
+        "available_rooms": available_rooms,
+        "total_bookings": total_bookings,
+        "paid_bookings": paid_bookings,
+    }
+    total_revenue = sum(compute_booking_total(b) for b in paid)
 
     return render_template(
         "admin/dashboard.html",
@@ -422,157 +342,173 @@ def admin_dashboard():
 
 
 @app.route("/admin/bookings")
-@login_required
+@roles_required("admin", "superadmin")
 def admin_bookings():
-    if current_user.role != "admin":
-        return redirect("/login")
-
     status = request.args.get("status")
     q_id = request.args.get("booking_id", "").strip()
 
-    q = Booking.query
+    q = admin_scoped_bookings()
     if status:
-        q = q.filter_by(payment_status=status)
-
+        q = q.filter(Booking.payment_status == status)
     if q_id:
         try:
-            bid = int(q_id)
-            q = q.filter(Booking.id == bid)
+            q = q.filter(Booking.id == int(q_id))
         except ValueError:
             q = q.filter(False)
 
     bookings = q.order_by(Booking.booking_date.desc()).all()
-    return render_template(
-        "admin/bookings.html",
-        bookings=bookings,
-        booking_id=q_id,
-    )
+    return render_template("admin/bookings.html", bookings=bookings, booking_id=q_id)
+
+
+def ensure_tenant_account_for_booking(booking: Booking):
+    if not booking.tenant_email:
+        return
+    user = User.query.filter_by(username=booking.tenant_email).first()
+    if user:
+        user.role = "tenant"
+        user.pg_id = booking.room.pg_id
+    else:
+        temp_password = "Tenant@" + str(booking.id)
+        user = User(
+            username=booking.tenant_email,
+            role="tenant",
+            pg_id=booking.room.pg_id,
+        )
+        user.set_password(temp_password)
+        db.session.add(user)
+        # TODO: send credentials via mail/SMS
+    db.session.flush()
+
+
+@app.route("/admin/bookings/<int:booking_id>/approve", methods=["POST"])
+@roles_required("admin", "superadmin")
+def admin_approve_booking(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    if current_user.role == "admin" and booking.room.pg_id != current_user.pg_id:
+        abort(403)
+    booking.booking_status = "approved"
+    ensure_tenant_account_for_booking(booking)
+    db.session.commit()
+    flash("Booking approved and tenant account created/updated.", "success")
+    return redirect(url_for("admin_bookings"))
 
 
 @app.route("/admin/bookings/<int:booking_id>/mark_paid", methods=["POST"])
-@login_required
+@roles_required("admin", "superadmin")
 def admin_mark_paid(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
-
     booking = Booking.query.get_or_404(booking_id)
+    if current_user.role == "admin" and booking.room.pg_id != current_user.pg_id:
+        abort(403)
     booking.payment_status = "paid"
     booking.payment_method = request.form.get("method", "cash")
-
-    if booking.kyc_status == "verified":
-        booking.booking_status = "confirmed"
-
     db.session.commit()
     flash("Booking marked as paid.", "success")
     return redirect(url_for("admin_bookings"))
 
 
-@app.route("/admin/bookings/<int:booking_id>/kyc", methods=["POST"])
-@login_required
-def admin_kyc_update(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
-
-    booking = Booking.query.get_or_404(booking_id)
-    new_status = request.form.get("kyc_status", "pending")
-    booking.kyc_status = new_status
-    booking.kyc_verified_by = current_user.id
-    booking.kyc_verified_at = datetime.utcnow()
-
-    if booking.kyc_status == "verified":
-        booking.booking_status = "kyc_verified"
-        if booking.payment_status == "paid":
-            booking.booking_status = "completed"
-
-    db.session.commit()
-    flash("KYC status updated.", "success")
-    return redirect(url_for("admin_bookings"))
-
-
 @app.route("/admin/bookings/<int:booking_id>/checkout", methods=["POST"])
-@login_required
+@roles_required("admin", "superadmin")
 def admin_checkout_booking(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
-
     booking = Booking.query.get_or_404(booking_id)
+    if current_user.role == "admin" and booking.room.pg_id != current_user.pg_id:
+        abort(403)
     booking.checkout_date = date.today()
     booking.booking_status = "checked_out"
     if booking.room:
         booking.room.available = True
-
     db.session.commit()
     flash("Guest checked out and room freed.", "success")
     return redirect(url_for("admin_bookings"))
 
 
-@app.route("/admin/bookings/<int:booking_id>/approve", methods=["POST"])
-@login_required
-def admin_approve_booking(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
+# Attendance (mark + report same page)
+@app.route("/admin/attendance", methods=["GET", "POST"])
+@roles_required("admin", "superadmin")
+def admin_attendance():
+    today = date.today()
 
-    booking = Booking.query.get_or_404(booking_id)
-    booking.booking_status = "approved"
-    db.session.commit()
-    flash("Booking approved.", "success")
-    return redirect(url_for("admin_bookings"))
-
-
-@app.route("/admin/bookings/<int:booking_id>/decline", methods=["POST"])
-@login_required
-def admin_decline_booking(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
-
-    booking = Booking.query.get_or_404(booking_id)
-    booking.booking_status = "declined"
-    if booking.room:
-        booking.room.available = True
-    db.session.commit()
-    flash("Booking declined.", "warning")
-    return redirect(url_for("admin_bookings"))
-
-
-@app.route("/admin/bookings/<int:booking_id>/complete", methods=["POST"])
-@login_required
-def admin_complete_booking(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
-
-    booking = Booking.query.get_or_404(booking_id)
-    if booking.kyc_status == "verified" and booking.payment_status in ("paid", "received"):
-        booking.booking_status = "completed"
-        db.session.commit()
-        flash("Booking marked as completed.", "success")
-    else:
-        flash(
-            "Ensure KYC is verified and payment is paid/received before completing.",
-            "error",
+    bookings = (
+        admin_scoped_bookings()
+        .filter(
+            Booking.booking_status.in_(["approved", "confirmed", "completed"])
         )
-    return redirect(url_for("admin_bookings"))
+        .order_by(Booking.id.desc())
+        .all()
+    )
+
+    if request.method == "POST":
+        for b in bookings:
+            value = request.form.get(f"booking_{b.id}")
+            status = "present" if value == "present" else "absent"
+            existing = Attendance.query.filter_by(
+                booking_id=b.id, date=today
+            ).first()
+            if existing:
+                existing.status = status
+            else:
+                db.session.add(Attendance(booking_id=b.id, date=today, status=status))
+        db.session.commit()
+        flash("Attendance saved for today.", "success")
+        return redirect(url_for("admin_attendance"))
+
+    today_map = {
+        a.booking_id: a.status
+        for a in Attendance.query.filter_by(date=today).all()
+    }
+
+    records = (
+        Attendance.query.join(Booking).join(Room)
+        .filter(Room.pg_id == current_user.pg_id if current_user.role == "admin" else True)
+        .order_by(Attendance.date.desc(), Booking.id.desc())
+        .all()
+    )
+
+    return render_template(
+        "admin/attendance.html",
+        bookings=bookings,
+        today=today,
+        today_map=today_map,
+        records=records,
+    )
 
 
-@app.route("/admin/bookings/<int:booking_id>")
-@login_required
-def admin_booking_detail(booking_id):
-    if current_user.role != "admin":
-        return redirect("/login")
-    booking = Booking.query.get_or_404(booking_id)
-    return render_template("admin/booking_detail.html", booking=booking)
+# Strength & revenue reports (already mostly done)
+@app.route("/admin/reports/strength")
+@roles_required("admin", "superadmin")
+def admin_strength_report():
+    q = (
+        db.session.query(
+            PG.id, PG.name, func.count(Booking.id).label("strength")
+        )
+        .join(Room, Room.pg_id == PG.id)
+        .join(Booking, Booking.room_id == Room.id)
+        .filter(
+            Booking.booking_status.in_(["approved", "confirmed", "completed"])
+        )
+    )
+    if current_user.role == "admin":
+        q = q.filter(PG.id == current_user.pg_id)
+
+    rows = q.group_by(PG.id, PG.name).all()
+    total_strength = sum(r.strength for r in rows)
+
+    return render_template(
+        "admin/strength.html",
+        rows=rows,
+        total_strength=total_strength,
+    )
 
 
-# ---- Reports ----
 @app.route("/admin/reports/revenue")
-@login_required
+@roles_required("admin", "superadmin")
 def admin_revenue_report():
-    if current_user.role != "admin":
-        return redirect("/login")
-
     from_date_str = request.args.get("from")
     to_date_str = request.args.get("to")
 
     q = Booking.query.filter_by(payment_status="paid")
+    if current_user.role == "admin":
+        q = q.join(Room).filter(Room.pg_id == current_user.pg_id)
+
     if from_date_str:
         from_date = datetime.strptime(from_date_str, "%Y-%m-%d")
         q = q.filter(Booking.booking_date >= from_date)
@@ -592,277 +528,110 @@ def admin_revenue_report():
     )
 
 
-@app.route("/admin/reports/strength")
-@login_required
-def admin_strength_report():
-    if current_user.role != "admin":
-        return redirect("/login")
-
-    rows = (
-        db.session.query(
-            PG.id,
-            PG.name,
-            func.count(Booking.id).label("strength"),
-        )
-        .join(Room, Room.pg_id == PG.id)
-        .join(Booking, Booking.room_id == Room.id)
-        .filter(
-            Booking.booking_status.in_(
-                ["approved", "confirmed", "completed"]
-            )
-        )
-        .group_by(PG.id, PG.name)
-        .all()
-    )
-    total_strength = sum(r.strength for r in rows)
-
-    return render_template(
-        "admin/strength_report.html",
-        rows=rows,
-        total_strength=total_strength,
-    )
+# ---------- Tenant ----------
+@app.route("/tenant/dashboard")
+@roles_required("tenant")
+def tenant_dashboard():
+    bookings = Booking.query.filter_by(tenant_email=current_user.username).all()
+    return render_template("tenant/dashboard.html", bookings=bookings)
 
 
-@app.route("/admin/attendance", methods=["GET", "POST"])
-@login_required
-def admin_attendance():
-    if current_user.role != "admin":
-        return redirect("/login")
-
-    today = date.today()
-
-    # bookings eligible for marking today
-    bookings = (
-        Booking.query.filter(
-            Booking.booking_status.in_(["approved", "confirmed", "completed"])
-        )
+@app.route("/tenant/billing")
+@roles_required("tenant")
+def tenant_billing():
+    booking = (
+        Booking.query
+        .filter_by(tenant_email=current_user.username)
         .order_by(Booking.id.desc())
-        .all()
+        .first_or_404()
     )
 
-    if request.method == "POST":
-        for b in bookings:
-            value = request.form.get(f"booking_{b.id}")  # "present" or None
-            status = "present" if value == "present" else "absent"
+    nights = 1
+    room_rate = booking.room.price
+    room_total = nights * room_rate
 
-            existing = Attendance.query.filter_by(
-                booking_id=b.id, date=today
-            ).first()
+    service_items = [
+        {
+            "name": s.service_type.name,
+            "unit_price": s.service_type.price,
+            "quantity": s.quantity,
+            "total": s.total_price,
+        }
+        for s in booking.services
+    ]
 
-            if existing:
-                existing.status = status
-            else:
-                db.session.add(
-                    Attendance(booking_id=b.id, date=today, status=status)
-                )
-        db.session.commit()
-        flash("Attendance saved for today.", "success")
-        return redirect(url_for("admin_attendance"))
+    subtotal = room_total + sum(i["total"] for i in service_items)
+    tax_percent = 12
+    tax_amount = subtotal * tax_percent / 100
+    total_payable = subtotal + tax_amount
 
-    # map for today's checkboxes
-    today_map = {
-        a.booking_id: a.status
-        for a in Attendance.query.filter_by(date=today).all()
+    amount_received = total_payable if booking.payment_status == "paid" else 0
+    balance = total_payable - amount_received
+
+    billing = {
+        "invoice_no": f"INV-{booking.id:04d}",
+        "date": booking.booking_date or datetime.utcnow(),
+        "booking": booking,
+        "guest": {
+            "name": booking.tenant_name,
+            "address": "",
+            "phone": booking.tenant_phone,
+            "email": booking.tenant_email,
+        },
+        "nights": nights,
+        "room_rate": room_rate,
+        "room_total": room_total,
+        "service_items": service_items,
+        "subtotal": subtotal,
+        "tax_percent": tax_percent,
+        "tax_amount": tax_amount,
+        "discount_amount": 0,
+        "total_payable": total_payable,
+        "amount_received": amount_received,
+        "balance": balance,
+        "payment_method": getattr(booking, "payment_method", "Cash"),
+        "remarks": "",
+        "is_paid": booking.payment_status == "paid",
     }
 
-    # simple attendance report (all records with booking + PG info)
-    records = (
-        Attendance.query
-        .join(Booking)
-        .join(Room)
-        .join(PG)
-        .order_by(Attendance.date.desc(), Booking.id.desc())
-        .all()
-    )
+    hotel = {
+        "name": booking.room.pg.name,
+        "address": booking.room.pg.location or "",
+        "phone": "",
+        "email": "",
+    }
 
-    return render_template(
-        "admin/attendance.html",
-        bookings=bookings,
-        today=today,
-        today_map=today_map,
-        records=records,
-    )
+    return render_template("tenant/billing.html", billing=billing, hotel=hotel)
 
 
-# ---- Admin PG management ----
-@app.route("/admin/pgs", methods=["GET"])
-@login_required
-def admin_pgs():
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
+@app.route("/tenant/booking/<int:booking_id>/services", methods=["GET", "POST"])
+@roles_required("tenant")
+def tenant_services(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    if booking.tenant_email != current_user.username:
+        abort(403)
 
-    pgs = PG.query.order_by(PG.id.desc()).all()
-    return render_template("admin/pg_form.html", pgs=pgs, pg=None, mode="create")
-
-
-@app.route("/admin/pgs/new", methods=["POST"])
-@login_required
-def admin_create_pg():
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
-    name = request.form.get("name", "").strip()
-    location = request.form.get("location", "").strip()
-    latitude = request.form.get("latitude")
-    longitude = request.form.get("longitude")
-
-    if not name:
-        flash("Name is required", "danger")
-        return redirect(url_for("admin_pgs"))
-
-    pg = PG(
-        name=name,
-        location=location or None,
-        latitude=float(latitude) if latitude else None,
-        longitude=float(longitude) if longitude else None,
-    )
-    db.session.add(pg)
-    db.session.commit()
-    flash("PG created successfully", "success")
-    return redirect(url_for("admin_pgs"))
-
-
-@app.route("/admin/pgs/<int:pg_id>/edit", methods=["GET", "POST"])
-@login_required
-def admin_edit_pg(pg_id):
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
-    pg = PG.query.get_or_404(pg_id)
+    services = ServiceType.query.filter_by(active=True).all()
 
     if request.method == "POST":
-        pg.name = request.form.get("name", "").strip()
-        pg.location = request.form.get("location", "").strip() or None
-        latitude = request.form.get("latitude")
-        longitude = request.form.get("longitude")
-        pg.latitude = float(latitude) if latitude else None
-        pg.longitude = float(longitude) if longitude else None
-
+        for s in services:
+            qty_str = request.form.get(f"service_{s.id}")
+            if qty_str:
+                qty = int(qty_str)
+                if qty > 0:
+                    db.session.add(
+                        BookingService(
+                            booking_id=booking.id,
+                            service_type_id=s.id,
+                            quantity=qty,
+                            total_price=qty * s.price,
+                        )
+                    )
         db.session.commit()
-        flash("PG updated successfully", "success")
-        return redirect(url_for("admin_pgs"))
+        flash("Services updated for your booking.", "success")
+        return redirect(url_for("tenant_dashboard"))
 
-    pgs = PG.query.order_by(PG.id.desc()).all()
-    return render_template("admin/pg_form.html", pgs=pgs, pg=pg, mode="edit")
-
-
-@app.route("/admin/pgs/<int:pg_id>/delete", methods=["POST"])
-@login_required
-def admin_delete_pg(pg_id):
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
-    pg = PG.query.get_or_404(pg_id)
-
-    if pg.rooms:
-        flash("Cannot delete PG with existing rooms.", "danger")
-        return redirect(url_for("admin_pgs"))
-
-    db.session.delete(pg)
-    db.session.commit()
-    flash("PG deleted successfully", "success")
-    return redirect(url_for("admin_pgs"))
-
-
-# ---- Admin: Room management using room_form.html ----
-@app.route("/admin/pgs/<int:pg_id>/rooms/new", methods=["GET", "POST"])
-@login_required
-def admin_create_room(pg_id):
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
-    pg = PG.query.get_or_404(pg_id)
-    rooms = Room.query.filter_by(pg_id=pg.id).order_by(Room.number).all()
-
-    if request.method == "POST":
-        number = request.form.get("number", "").strip()
-        price = request.form.get("price")
-        sharing = request.form.get("sharing") or 1
-        ac_type = request.form.get("ac_type", "non-ac")
-
-        if not number or not price:
-            flash("Room number and price are required", "danger")
-            return render_template(
-                "admin/room_form.html", pg=pg, rooms=rooms, room=None
-            )
-
-        filename = None
-        file = request.files.get("image")
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-
-        room = Room(
-            number=number,
-            price=float(price),
-            sharing=int(sharing),
-            ac_type=ac_type,
-            image_url=filename,
-            available=True,
-            pg_id=pg.id,
-        )
-        db.session.add(room)
-        pg.total_rooms = (pg.total_rooms or 0) + 1
-        db.session.commit()
-        flash("Room created successfully", "success")
-        return redirect(url_for("admin_create_room", pg_id=pg.id))
-
-    return render_template("admin/room_form.html", pg=pg, rooms=rooms, room=None)
-
-
-@app.route("/admin/rooms/<int:room_id>/edit", methods=["GET", "POST"])
-@login_required
-def admin_edit_room(room_id):
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
-    room = Room.query.get_or_404(room_id)
-    pg = room.pg
-    rooms = Room.query.filter_by(pg_id=pg.id).order_by(Room.number).all()
-
-    if request.method == "POST":
-        room.number = request.form.get("number", "").strip()
-        room.price = float(request.form.get("price"))
-        room.sharing = int(request.form.get("sharing") or 1)
-        room.ac_type = request.form.get("ac_type", "non-ac")
-
-        file = request.files.get("image")
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            room.image_url = filename
-
-        db.session.commit()
-        flash("Room updated successfully", "success")
-        return redirect(url_for("admin_create_room", pg_id=pg.id))
-
-    return render_template("admin/room_form.html", pg=pg, rooms=rooms, room=room)
-
-
-@app.route("/admin/rooms/<int:room_id>/delete", methods=["POST"])
-@login_required
-def admin_delete_room(room_id):
-    if current_user.role != "admin":
-        flash("Admin access only")
-        return redirect("/login")
-
-    room = Room.query.get_or_404(room_id)
-    pg_id = room.pg_id
-
-    db.session.delete(room)
-    pg = PG.query.get(pg_id)
-    if pg and pg.total_rooms:
-        pg.total_rooms = max(pg.total_rooms - 1, 0)
-
-    db.session.commit()
-    flash("Room deleted successfully", "success")
-    return redirect(url_for("admin_create_room", pg_id=pg_id))
+    return render_template("tenant/services.html", booking=booking, services=services)
 
 
 if __name__ == "__main__":
