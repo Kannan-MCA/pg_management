@@ -632,6 +632,40 @@ def tenant_services(booking_id):
         return redirect(url_for("tenant_dashboard"))
 
     return render_template("tenant/services.html", booking=booking, services=services)
+@app.route("/admin/pg/<int:pg_id>/rooms", methods=["GET", "POST"])
+@roles_required("admin", "superadmin")
+def admin_pg_rooms(pg_id):
+    pg = PG.query.get_or_404(pg_id)
+
+    # if normal admin, ensure they own this PG
+    if current_user.role == "admin" and current_user.pg_id != pg.id:
+        abort(403)
+
+    if request.method == "POST":
+        number = request.form.get("number", "").strip()
+        price = float(request.form.get("price") or 0)
+        sharing = int(request.form.get("sharing") or 1)
+        ac_type = request.form.get("ac_type") or "non-ac"
+
+        if not number or price <= 0:
+            flash("Room number and price are required.", "danger")
+        else:
+            room = Room(
+                number=number,
+                price=price,
+                sharing=sharing,
+                ac_type=ac_type,
+                pg_id=pg.id,
+                available=True,
+            )
+            db.session.add(room)
+            pg.total_rooms = (pg.total_rooms or 0) + 1
+            db.session.commit()
+            flash("Room added to PG.", "success")
+        return redirect(url_for("admin_pg_rooms", pg_id=pg.id))
+
+    rooms = Room.query.filter_by(pg_id=pg.id).order_by(Room.number).all()
+    return render_template("admin/pg_rooms.html", pg=pg, rooms=rooms)
 
 
 if __name__ == "__main__":

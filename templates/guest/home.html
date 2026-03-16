@@ -1,51 +1,51 @@
 {% extends "base.html" %}
-{% block title %}PG Listings{% endblock %}
+{% block title %}Browse PGs{% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="container">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">
-      <i class="fas fa-home me-2 text-info"></i>
-      Find Your PG
-    </h2>
-    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-sm">
-      <i class="fas fa-sign-in-alt me-1"></i>Login
-    </a>
-  </div>
-
-  <form method="get" class="mb-3">
-    <div class="input-group">
-      <input type="text" name="search" class="form-control form-control-sm"
-             placeholder="Search by PG name or location"
-             value="{{ search_query or '' }}">
-      <button class="btn btn-info btn-sm" type="submit">
-        <i class="fas fa-search"></i>
-      </button>
+  <div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+      <h1 class="h3 fw-semibold mb-1">Find your next PG</h1>
+      <p class="text-secondary mb-0">Browse locations, compare rooms and request a booking in a few clicks.</p>
     </div>
-  </form>
+    <div class="col-md-4 mt-3 mt-md-0">
+      <form method="get">
+        <div class="input-group input-group-sm">
+          <input type="text" name="search" class="form-control"
+                 placeholder="Search by PG name or location"
+                 value="{{ search_query or '' }}">
+          <button class="btn btn-primary" type="submit">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   {% if pgs %}
     <div class="row g-3">
       {% for pg in pgs %}
         <div class="col-md-4">
-          <div class="card-glass p-3 h-100">
-            <h5 class="mb-1">{{ pg.name }}</h5>
-            <p class="text-white-50 mb-2">
-              {{ pg.location or 'Location not specified' }}
-            </p>
-            <p class="small text-white-50 mb-3">
-              Rooms: {{ pg.total_rooms or 0 }}
-            </p>
-            <a href="{{ url_for('rooms', pg_id=pg.id) }}" class="btn btn-outline-info btn-sm">
-              <i class="fas fa-door-open me-1"></i>View Rooms
-            </a>
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <h5 class="card-title mb-1">{{ pg.name }}</h5>
+              <p class="card-subtitle text-secondary small mb-2">
+                {{ pg.location or 'Location not specified' }}
+              </p>
+              <p class="text-secondary small mb-3">
+                Rooms: {{ pg.total_rooms or 0 }}
+              </p>
+              <a href="{{ url_for('rooms', pg_id=pg.id) }}" class="btn btn-sm btn-outline-primary">
+                View Rooms
+              </a>
+            </div>
           </div>
         </div>
       {% endfor %}
     </div>
   {% else %}
-    <p class="text-white-50">No PGs found.</p>
+    <div class="text-secondary">No PGs found.</div>
   {% endif %}
 
 </div>
