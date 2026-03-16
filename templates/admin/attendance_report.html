@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Attendance Report{% endblock %}
+
+{% block content %}
+<h4>Attendance Report</h4>
+
+<form method="get" class="row card-panel">
+  <div class="input-field col s12 m4">
+    <input id="from" name="from" type="text" class="datepicker" value="{{ from_date or '' }}">
+    <label for="from">From Date</label>
+  </div>
+  <div class="input-field col s12 m4">
+    <input id="to" name="to" type="text" class="datepicker" value="{{ to_date or '' }}">
+    <label for="to">To Date</label>
+  </div>
+  <div class="col s12 m4" style="margin-top:20px;">
+    <button type="submit" class="btn blue">Apply</button>
+    <a href="{{ url_for('admin_attendance_report') }}" class="btn-flat">Clear</a>
+  </div>
+</form>
+
+<h5>Present Days per Booking</h5>
+<table class="striped responsive-table">
+  <thead>
+    <tr>
+      <th>Booking</th>
+      <th>Tenant</th>
+      <th>Present Days</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in agg %}
+      <tr>
+        <td>BK{{ "%04d"|format(a.id) }}</td>
+        <td>{{ a.tenant_name }}</td>
+        <td>{{ a.present_days }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3">No attendance data.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h5>Detailed Records</h5>
+<table class="striped responsive-table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Booking</th>
+      <th>PG</th>
+      <th>Room</th>
+      <th>Tenant</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in records %}
+      <tr>
+        <td>{{ r.date }}</td>
+        <td>BK{{ "%04d"|format(r.booking.id) }}</td>
+        <td>{{ r.booking.room.pg.name }}</td>
+        <td>{{ r.booking.room.number }}</td>
+        <td>{{ r.booking.tenant_name }}</td>
+        <td>{{ r.status|capitalize }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No records in this range.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

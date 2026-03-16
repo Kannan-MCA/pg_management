@@ -1,176 +1,225 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - PG Management</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { 
-            background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
-            background-size: 100% 100%;
-            min-height: 100vh;
-            color: white;
-            position: relative;
-        }
-        
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-image: 
-                radial-gradient(2px 2px at 20px 30px, #1bc958, transparent),
-                radial-gradient(2px 2px at 40px 70px, white, transparent),
-                radial-gradient(1px 1px at 90px 40px, #4d06c7, transparent),
-                radial-gradient(1px 1px at 130px 80px, #a41616, transparent);
-            background-repeat: repeat;
-            background-size: 200px 100px;
-            animation: stars 20s linear infinite;
-            box-shadow: #1bc958 0px 0px 10px, white 0px 0px 5px, #4d06c7 0px 0px 15px, #a41616 0px 0px 20px;
-        }
-        
-        @keyframes stars {
-            from { transform: translateY(0px); }
-            to { transform: translateY(-100px); }
-        }       
-        
-        .admin-card {
-            background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            transition: all 0.3s ease;
-            height: 100%;
-        }
+  <meta charset="UTF-8">
+  <title>Admin Dashboard - PG Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        .admin-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-        }
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            line-height: 1;
-        }
-        
-        .btn-glow {
-            background: linear-gradient(45deg, #4ecdc4, #44a08d);
-            border: none;
-            border-radius: 12px;
-            padding: 10px 20px;
-            color: white;
-            font-weight: bold;
-            box-shadow: 0 5px 20px rgba(78,205,196,0.4);
-            transition: all 0.3s;
-        }
-        .btn-glow:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(78,205,196,0.6);
-        }
-    </style>
+  <style>
+    body {
+      background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+      background-size: 100% 100%;
+      min-height: 100vh;
+      color: white;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-image:
+        radial-gradient(2px 2px at 20px 30px, #1bc958, transparent),
+        radial-gradient(2px 2px at 40px 70px, white, transparent),
+        radial-gradient(1px 1px at 90px 40px, #4d06c7, transparent),
+        radial-gradient(1px 1px at 130px 80px, #a41616, transparent);
+      background-repeat: repeat;
+      background-size: 200px 100px;
+      animation: stars 20s linear infinite;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @keyframes stars {
+      from { transform: translateY(0px); }
+      to { transform: translateY(-100px); }
+    }
+
+    .admin-card {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      transition: all 0.3s ease;
+      height: 100%;
+    }
+
+    .admin-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .btn-glow {
+      background: linear-gradient(45deg, #4ecdc4, #44a08d);
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 5px 20px rgba(78,205,196,0.4);
+      transition: all 0.3s;
+    }
+    .btn-glow:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(78,205,196,0.6);
+    }
+  </style>
 </head>
-
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-transparent">
-        <div class="container">
-            <a class="navbar-brand fs-3 fw-bold" href="{{ url_for('admin_dashboard') }}">
-                <i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard
-            </a>
-            <div class="navbar-nav ms-auto d-flex align-items-center gap-3">
-                <a class="nav-link btn btn-outline-light btn-glow px-3 py-2" href="{{ url_for('pgs') }}">
-                    <i class="fas fa-eye me-1"></i>Public PGs
-                </a>
-                <a class="nav-link btn btn-outline-danger btn-glow px-3 py-2" href="{{ url_for('admin_logout') }}">
-                    <i class="fas fa-sign-out-alt me-1"></i>Logout
-                </a>
-            </div>
-        </div>
-    </nav>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-transparent">
+    <div class="container">
+      <a class="navbar-brand fs-3 fw-bold" href="{{ url_for('admin_dashboard') }}">
+        <i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard
+      </a>
+      <div class="navbar-nav ms-auto d-flex align-items-center gap-3">
+        <a class="nav-link btn btn-outline-light btn-glow px-3 py-2" href="{{ url_for('pgs') }}">
+          <i class="fas fa-eye me-1"></i>Public PGs
+        </a>
+        <a class="nav-link btn btn-outline-danger btn-glow px-3 py-2" href="{{ url_for('admin_logout') }}">
+          <i class="fas fa-sign-out-alt me-1"></i>Logout
+        </a>
+      </div>
+    </div>
+  </nav>
 
-    <div class="container py-5">
-        <!-- Header -->
-        <div class="row mb-5">
-            <div class="col-12 text-center">
-                <h1 class="display-4 fw-bold mb-2">Welcome Back, Admin!</h1>
-                <p class="lead text-white-50">Manage your PG properties and bookings</p>
-            </div>
-        </div>
-
-        <!-- Stats Row - 4 Equal Columns -->
-        <div class="row g-4 mb-5">
-            <div class="col-lg-3 col-md-6">
-                <div class="admin-card p-4 text-center h-100">
-                    <i class="fas fa-building fa-3x text-primary mb-3"></i>
-                    <div class="stat-number text-white">{{ stats.total_pgs }}</div>
-                    <p class="text-white-50 mb-0 fs-5">Total PGs</p>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <div class="admin-card p-4 text-center h-100">
-                    <i class="fas fa-bed fa-3x text-success mb-3"></i>
-                    <div class="stat-number text-white">{{ stats.total_rooms }}</div>
-                    <p class="text-white-50 mb-0 fs-5">Total Rooms</p>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <div class="admin-card p-4 text-center h-100">
-                    <i class="fas fa-check-circle fa-3x text-info mb-3"></i>
-                    <div class="stat-number text-white">{{ stats.available_rooms }}</div>
-                    <p class="text-white-50 mb-0 fs-5">Available Rooms</p>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6">
-                <div class="admin-card p-4 text-center h-100">
-                    <i class="fas fa-clock fa-3x text-warning mb-3"></i>
-                    <!-- 🔥 FIXED: No Booking.query in template -->
-                    <div class="stat-number text-white">{{ stats.total_bookings or 0 }}</div>
-                    <p class="text-white-50 mb-0 fs-5">Total Bookings</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Actions Row - 3 Equal Columns -->
-        <div class="row g-4">
-            <!-- Column 1 -->
-            <div class="col-lg-4 col-md-6">
-                <a href="{{ url_for('admin_pgs') }}" class="text-decoration-none text-white">
-                    <div class="admin-card p-5 text-center h-100">
-                        <i class="fas fa-building fa-4x mb-3 text-primary"></i>
-                        <h3 class="mb-2">Manage PGs</h3>
-                        <p class="text-white-50 mb-0 fs-6">Add, edit, delete PG properties</p>
-                    </div>
-                </a>
-            </div>
-
-            <div class="col-lg-4 col-md-6">
-                <a href="{{ url_for('admin_all_rooms') }}" class="text-decoration-none text-white">
-                    <div class="admin-card p-5 text-center h-100">
-                        <i class="fas fa-bed fa-4x mb-3 text-success"></i>
-                        <h3 class="mb-2">All Rooms</h3>
-                        <p class="text-white-50 mb-0 fs-6">View & manage all rooms</p>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Column 3: View Bookings -->
-            <div class="col-lg-4 col-md-6">
-                <a href="{{ url_for('admin_bookings') }}" class="text-decoration-none text-white">
-                    <div class="admin-card p-5 text-center h-100">
-                        <i class="fas fa-list fa-4x mb-3 text-info"></i>
-                        <h3 class="mb-2">View Bookings</h3>
-                        <p class="text-white-50 mb-0 fs-6">All tenant bookings & status</p>
-                    </div>
-                </a>
-            </div>
-        </div>
+  <div class="container py-5">
+    <!-- Header -->
+    <div class="row mb-5">
+      <div class="col-12 text-center">
+        <h1 class="display-4 fw-bold mb-2">Welcome Back, Admin!</h1>
+        <p class="lead text-white-50">Manage your PG properties and bookings</p>
+      </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Stats Row -->
+    <div class="row g-4 mb-5">
+      <div class="col-lg-3 col-md-6">
+        <div class="admin-card p-4 text-center h-100">
+          <i class="fas fa-building fa-3x text-primary mb-3"></i>
+          <div class="stat-number text-white">{{ stats.total_pgs }}</div>
+          <p class="text-white-50 mb-0 fs-5">Total PGs</p>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="admin-card p-4 text-center h-100">
+          <i class="fas fa-bed fa-3x text-success mb-3"></i>
+          <div class="stat-number text-white">{{ stats.total_rooms }}</div>
+          <p class="text-white-50 mb-0 fs-5">Total Rooms</p>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="admin-card p-4 text-center h-100">
+          <i class="fas fa-check-circle fa-3x text-info mb-3"></i>
+          <div class="stat-number text-white">{{ stats.available_rooms }}</div>
+          <p class="text-white-50 mb-0 fs-5">Available Rooms</p>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="admin-card p-4 text-center h-100">
+          <i class="fas fa-clock fa-3x text-warning mb-3"></i>
+          <div class="stat-number text-white">{{ stats.total_bookings or 0 }}</div>
+          <p class="text-white-50 mb-0 fs-5">Total Bookings</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions Row -->
+    <div class="row g-4">
+      <!-- Manage PGs -->
+      <div class="col-lg-4 col-md-6">
+        <a href="{{ url_for('admin_pgs') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-5 text-center h-100">
+            <i class="fas fa-building fa-4x mb-3 text-primary"></i>
+            <h3 class="mb-2">Manage PGs</h3>
+            <p class="text-white-50 mb-0 fs-6">Add, edit, delete PG properties</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Rooms (via bookings for now) -->
+      <div class="col-lg-4 col-md-6">
+        <a href="{{ url_for('admin_bookings') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-5 text-center h-100">
+            <i class="fas fa-bed fa-4x mb-3 text-success"></i>
+            <h3 class="mb-2">All Rooms</h3>
+            <p class="text-white-50 mb-0 fs-6">View & manage all rooms (via bookings)</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Bookings -->
+      <div class="col-lg-4 col-md-6">
+        <a href="{{ url_for('admin_bookings') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-5 text-center h-100">
+            <i class="fas fa-list fa-4x mb-3 text-info"></i>
+            <h3 class="mb-2">View Bookings</h3>
+            <p class="text-white-50 mb-0 fs-6">All tenant bookings & status</p>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Extra row for Reports / Attendance -->
+    <div class="row g-4 mt-4">
+      <!-- Revenue report -->
+      <div class="col-lg-3 col-md-6">
+        <a href="{{ url_for('admin_revenue_report') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-4 text-center h-100">
+            <i class="fas fa-rupee-sign fa-3x mb-3 text-warning"></i>
+            <h4 class="mb-2">Revenue</h4>
+            <p class="text-white-50 mb-0 fs-6">View revenue report</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Strength report -->
+      <div class="col-lg-3 col-md-6">
+        <a href="{{ url_for('admin_strength_report') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-4 text-center h-100">
+            <i class="fas fa-users fa-3x mb-3 text-info"></i>
+            <h4 class="mb-2">Strength</h4>
+            <p class="text-white-50 mb-0 fs-6">Current occupancy per PG</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Today attendance -->
+      <div class="col-lg-3 col-md-6">
+        <a href="{{ url_for('admin_attendance') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-4 text-center h-100">
+            <i class="fas fa-user-check fa-3x mb-3 text-success"></i>
+            <h4 class="mb-2">Mark Attendance</h4>
+            <p class="text-white-50 mb-0 fs-6">Daily tenant attendance</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Attendance report -->
+      <div class="col-lg-3 col-md-6">
+        <a href="{{ url_for('admin_attendance') }}" class="text-decoration-none text-white">
+          <div class="admin-card p-4 text-center h-100">
+            <i class="fas fa-chart-bar fa-3x mb-3 text-primary"></i>
+            <h4 class="mb-2">Attendance Report</h4>
+            <p class="text-white-50 mb-0 fs-6">History & present days</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

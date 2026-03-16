@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manage PGs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white">
+  <div class="container py-5">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="mb-0">Manage PGs</h1>
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Form: Add or Edit PG -->
+    <div class="card bg-transparent border-light mb-4">
+      <div class="card-header">
+        {% if mode == 'edit' and pg %}
+          Edit PG #{{ pg.id }}
+        {% else %}
+          Add New PG
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <form method="post"
+              action="{% if mode == 'edit' and pg %}{{ url_for('admin_edit_pg', pg_id=pg.id) }}{% else %}{{ url_for('admin_create_pg') }}{% endif %}">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Name*</label>
+              <input type="text" name="name" class="form-control"
+                     value="{{ pg.name if pg else '' }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Location</label>
+              <input type="text" name="location" class="form-control"
+                     value="{{ pg.location if pg else '' }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Latitude</label>
+              <input id="lat-input" type="number" step="0.000001" name="latitude" class="form-control"
+                     value="{{ pg.latitude if pg and pg.latitude is not none else '' }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Longitude</label>
+              <input id="lon-input" type="number" step="0.000001" name="longitude" class="form-control"
+                     value="{{ pg.longitude if pg and pg.longitude is not none else '' }}">
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex align-items-center gap-2">
+            <button type="submit" class="btn btn-primary">
+              {% if mode == 'edit' and pg %}Update{% else %}Save{% endif %}
+            </button>
+            {% if mode == 'edit' and pg %}
+              <a href="{{ url_for('admin_pgs') }}" class="btn btn-secondary">Cancel Edit</a>
+            {% endif %}
+
+            <!-- Get current location button -->
+            <button type="button" class="btn btn-outline-info ms-auto" onclick="fillCurrentLocation()">
+              Use Current Location
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Table: All PGs -->
+    <div class="card bg-transparent border-light">
+      <div class="card-body p-0">
+        <table class="table table-dark table-hover align-middle mb-0">
+          <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Location</th>
+            <th>Lat</th>
+            <th>Long</th>
+            <th>Total Rooms</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for row in pgs %}
+            <tr>
+              <td>{{ row.id }}</td>
+              <td>{{ row.name }}</td>
+              <td>{{ row.location or '-' }}</td>
+              <td>{{ row.latitude or '-' }}</td>
+              <td>{{ row.longitude or '-' }}</td>
+              <td>{{ row.total_rooms or 0 }}</td>
+              <td>
+                <a href="{{ url_for('admin_edit_pg', pg_id=row.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{{ url_for('admin_create_room', pg_id=row.id) }}" class="btn btn-sm btn-info">Add Room</a>
+                <form action="{{ url_for('admin_delete_pg', pg_id=row.id) }}"
+                      method="post" style="display:inline-block"
+                      onsubmit="return confirm('Delete this PG?');">
+                  <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">
+                No PGs yet. Use the form above to add one.
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function fillCurrentLocation() {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by this browser.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          document.getElementById('lat-input').value = lat.toFixed(6);
+          document.getElementById('lon-input').value = lon.toFixed(6);
+        },
+        function(error) {
+          console.error(error);
+          alert("Unable to get your location. Please allow location access in your browser.");
+        }
+      );
+    }
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

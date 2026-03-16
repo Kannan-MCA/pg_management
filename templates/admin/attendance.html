@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Attendance{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+      <i class="fas fa-user-check me-2 text-info"></i>
+      Attendance
+    </h2>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light btn-sm">
+      <i class="fas fa-arrow-left me-1"></i>Dashboard
+    </a>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- Today summary -->
+  <div class="card-glass p-3 mb-4">
+    <h4 class="mb-0">
+      Today’s Attendance:
+      <span class="text-info">{{ today }}</span>
+    </h4>
+    <small class="text-white-50">
+      Mark present/absent for current active bookings (approved / confirmed / completed).
+    </small>
+  </div>
+
+  <!-- Mark attendance table -->
+  <div class="card-glass p-4 mb-4">
+    <h5 class="mb-3">Mark Attendance</h5>
+
+    <form method="post">
+      {% if bookings %}
+        <div class="table-responsive">
+          <table class="table table-dark table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Booking</th>
+                <th>PG</th>
+                <th>Room</th>
+                <th>Tenant</th>
+                <th>Present?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in bookings %}
+                {% set status = today_map.get(b.id, 'present') %}
+                <tr>
+                  <td>BK{{ "%04d"|format(b.id) }}</td>
+                  <td>{{ b.room.pg.name }}</td>
+                  <td>{{ b.room.number }}</td>
+                  <td>{{ b.tenant_name }}</td>
+                  <td>
+                    <div class="form-check">
+                      <input class="form-check-input"
+                             type="checkbox"
+                             id="booking_{{ b.id }}"
+                             name="booking_{{ b.id }}"
+                             value="present"
+                             {% if status == 'present' %}checked{% endif %}>
+                      <label class="form-check-label" for="booking_{{ b.id }}">
+                        Present
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-white-50 mb-0">No active bookings to mark attendance.</p>
+      {% endif %}
+
+      <div class="mt-3 d-flex justify-content-between">
+        <button type="submit" class="btn btn-primary btn-sm">
+          Save Attendance
+        </button>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light btn-sm">
+          <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Attendance report -->
+  <div class="card-glass p-4">
+    <h5 class="mb-3">Attendance Report</h5>
+
+    {% if records %}
+      <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Booking</th>
+              <th>PG</th>
+              <th>Room</th>
+              <th>Tenant</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+                <td>BK{{ "%04d"|format(r.booking.id) }}</td>
+                <td>{{ r.booking.room.pg.name }}</td>
+                <td>{{ r.booking.room.number }}</td>
+                <td>{{ r.booking.tenant_name }}</td>
+                <td>
+                  {% if r.status == 'present' %}
+                    <span class="badge bg-success">Present</span>
+                  {% else %}
+                    <span class="badge bg-danger">Absent</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-white-50 mb-0">No attendance records yet.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
